@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.example.springsecurity.exception.BlogNotFoundException;
 import com.example.springsecurity.model.Blog;
 import com.example.springsecurity.model.Users;
 import com.example.springsecurity.repo.BlogRepository;
@@ -15,8 +16,11 @@ import com.example.springsecurity.repo.UserRepo;
 @Service
 public class BlogService {
 
-    @Autowired private BlogRepository blogRepository;
-    @Autowired private UserRepo userRepo;
+    @Autowired 
+    private BlogRepository blogRepository;
+
+    @Autowired 
+    private UserRepo userRepo;
 
     public Blog createBlog(Blog blog, String username) {
         Users user = userRepo.findByUsername(username);
@@ -35,27 +39,35 @@ public class BlogService {
     }
 
     public Optional<Blog> updateBlog(Long id, Blog updatedBlog, String username) {
-        return blogRepository.findById(id)
-                .filter(blog -> blog.getUser().getUsername().equals(username))
-                .map(blog -> {
-                    blog.setTitle(updatedBlog.getTitle());
-                    blog.setDescription(updatedBlog.getDescription());
-                    blog.setImageUrl(updatedBlog.getImageUrl());
-                    return blogRepository.save(blog);
-                });
+        Blog blog = blogRepository.findById(id)
+                .orElseThrow(() -> new BlogNotFoundException("Blog with ID " + id + " not found"));
+
+        if (!blog.getUser().getUsername().equals(username)) {
+            return Optional.empty(); // handled in controller
+        }
+
+        blog.setTitle(updatedBlog.getTitle());
+        blog.setDescription(updatedBlog.getDescription());
+        blog.setImageUrl(updatedBlog.getImageUrl());
+        return Optional.of(blogRepository.save(blog));
     }
 
     public boolean deleteBlog(Long id, String username) {
-        return blogRepository.findById(id)
-                .filter(blog -> blog.getUser().getUsername().equals(username))
-                .map(blog -> {
-                    blogRepository.delete(blog);
-                    return true;
-                })
-                .orElse(false);
+        Blog blog = blogRepository.findById(id)
+                .orElseThrow(() -> new BlogNotFoundException("Blog with ID " + id + " not found"));
+
+        if (!blog.getUser().getUsername().equals(username)) {
+            return false;
+        }
+
+        blogRepository.delete(blog);
+        return true;
     }
 
     public void adminDeleteBlog(Long id) {
+        if (!blogRepository.existsById(id)) {
+            throw new BlogNotFoundException("Blog with ID " + id + " not found");
+        }
         blogRepository.deleteById(id);
     }
 }
